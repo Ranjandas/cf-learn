@@ -1,0 +1,123 @@
+---
+
+- hosts: localhost
+  vars:
+    aws_access_key: ""
+    aws_secret_key: ""
+    base_stack_name: "TechChallenge-Base"
+    shared_stack_name: "TechChallenge-Shared"
+    wordpress_db_user: "dummyuser"
+    wordpress_db_pass: "dummypass"
+    wordpress_db_name: "wordpress"
+
+  tasks:
+    - name: Deploy TechChallenge Base CF Stack
+      cloudformation:
+        stack_name: "{{ base_stack_name }}"
+        template: "../cloudformation/base.yml"
+        region: ap-southeast-2
+        aws_access_key: "{{ aws_access_key }}"
+        aws_secret_key: "{{ aws_secret_key }}"
+        state: present
+
+    - name: Deploy TechChallenge Shared CF Stack
+      cloudformation:
+        stack_name: "{{ shared_stack_name }}"
+        template: "../cloudformation/shared.yml"
+        region: ap-southeast-2
+        template_parameters:
+          BaseStackName: "{{ base_stack_name }}"
+        aws_access_key: "{{ aws_access_key }}"
+        aws_secret_key: "{{ aws_secret_key }}"
+        state: present
+
+    - name: Deploy DB Instances - AZ1
+      cloudformation:
+        stack_name: "TechChallenge-DBInstance1"
+        template: "../cloudformation/db.yml"
+        region: "ap-southeast-2"
+        template_parameters:
+          ImageId: "ami-9a3322f9"
+          EC2AvailabilityZone: "ap-southeast-2a"
+          KeyName: "tech-challenge"
+          SharedStackName: "{{ shared_stack_name }}"
+          BaseStackName: "{{ base_stack_name }}"
+          DBInstanceSubnetExportName: "{{ shared_stack_name }}-DBPrivSubnet1ID"
+          WordPressDBUser: "{{ wordpress_db_user }}"
+          WordPressDBPass: "{{ wordpress_db_pass }}"
+          WordPressDBName: "{{ wordpress_db_name }}"
+        aws_access_key: "{{ aws_access_key }}"
+        aws_secret_key: "{{ aws_secret_key }}"
+        state: present
+      register: Stack_DB1
+
+    - name: Deploy DB Instances - AZ2
+      cloudformation:
+        stack_name: "TechChallenge-DBInstance2"
+        template: "../cloudformation/db.yml"
+        region: "ap-southeast-2"
+        template_parameters:
+          ImageId: "ami-9a3322f9"
+          EC2AvailabilityZone: "ap-southeast-2b"
+          KeyName: "tech-challenge"
+          BaseStackName: "{{ base_stack_name }}"
+          SharedStackName: "{{ shared_stack_name }}"
+          DBInstanceSubnetExportName: "{{ shared_stack_name }}-DBPrivSubnet2ID"
+          WordPressDBUser: "{{ wordpress_db_user }}"
+          WordPressDBPass: "{{ wordpress_db_pass }}"
+          WordPressDBName: "{{ wordpress_db_name }}"
+        aws_access_key: "{{ aws_access_key }}"
+        aws_secret_key: "{{ aws_secret_key }}"
+        state: present
+      register: Stack_DB2
+
+    - name: Deploy App Instances - AZ1
+      cloudformation:
+        stack_name: "TechChallenge-AppInstance1"
+        template: "../cloudformation/app.yml"
+        region: "ap-southeast-2"
+        template_parameters:
+          ImageId: "ami-9a3322f9"
+          EC2AvailabilityZone: "ap-southeast-2a"
+          KeyName: "tech-challenge"
+          SharedStackName: "{{ shared_stack_name }}"
+          BaseStackName: "{{ base_stack_name }}"
+          AppInstanceSubnetExportName: "{{ shared_stack_name }}-AppPrivSubnet1ID"
+          WordPressDBUser: "{{ wordpress_db_user }}"
+          WordPressDBPass: "{{ wordpress_db_pass }}"
+          WordPressDBName: "{{ wordpress_db_name }}"
+          WordPressDBHost: "{{ Stack_DB1.stack_outputs.DBInstancePrivateIP }}"
+        aws_access_key: "{{ aws_access_key }}"
+        aws_secret_key: "{{ aws_secret_key }}"
+        state: present
+
+    - name: Deploy App Instances - AZ2
+      cloudformation:
+        stack_name: "TechChallenge-AppInstance2"
+        template: "../cloudformation/app.yml"
+        region: "ap-southeast-2"
+        template_parameters:
+          ImageId: "ami-9a3322f9"
+          EC2AvailabilityZone: "ap-southeast-2b"
+          KeyName: "tech-challenge"
+          BaseStackName: "{{ base_stack_name }}"
+          SharedStackName: "{{ shared_stack_name }}"
+          AppInstanceSubnetExportName: "{{ shared_stack_name }}-AppPrivSubnet2ID"
+          WordPressDBUser: "{{ wordpress_db_user }}"
+          WordPressDBPass: "{{ wordpress_db_pass }}"
+          WordPressDBName: "{{ wordpress_db_name }}"
+          WordPressDBHost: "{{ Stack_DB2.stack_outputs.DBInstancePrivateIP }}"
+        aws_access_key: "{{ aws_access_key }}"
+        aws_secret_key: "{{ aws_secret_key }}"
+        state: present
+
+    - name: Deploy ELB
+      cloudformation:
+        stack_name: "TechChallenge-ELB"
+        template: "../cloudformation/frontend.yml"
+        region: "ap-southeast-2"
+        template_parameters:
+          SharedStackName: "{{ shared_stack_name }}"
+        aws_access_key: "{{ aws_access_key }}"
+        aws_secret_key: "{{ aws_secret_key }}"
+        state: present
