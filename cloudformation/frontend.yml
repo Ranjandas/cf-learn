@@ -1,0 +1,22 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Cloudformation Template for Creating FrontEnd Services"
+Parameters:
+  SharedStackName:
+    Description: "Name of Shared Stack"
+    Type: "String"
+Resources:
+  ElasticLoadBalancer:
+    Type: "AWS::ElasticLoadBalancing::LoadBalancer"
+    Properties:
+      SecurityGroups:
+        - Fn::ImportValue: !Sub "${SharedStackName}-ELBSecurityGroupID"
+      Subnets:
+        - Fn::ImportValue: !Sub "${SharedStackName}-PubSubnet1ID"
+        - Fn::ImportValue: !Sub "${SharedStackName}-PubSubnet2ID"
+      Listeners:
+        - LoadBalancerPort: 80
+          InstancePort: 80
+          Protocol: "HTTP"
+      Instances:
+        - Fn::ImportValue: "TechChallenge-AppInstance1-InstanceID"
+        - Fn::ImportValue: "TechChallenge-AppInstance2-InstanceID"

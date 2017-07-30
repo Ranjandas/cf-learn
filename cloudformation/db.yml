@@ -1,0 +1,94 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Cloudformation Template for Creating DB Instances"
+Parameters:
+  ImageId:
+    Description: "ID of the Image to use for this instance"
+    Type: "String"
+    Default: "ami-10918173"
+  KeyName:
+    Description: "Name of an existing EC2 KeyPair"
+    Type: "AWS::EC2::KeyPair::KeyName"
+    Default: "tech-challenge"
+  EC2InstanceType:
+    Description: "EC2 Instance Type"
+    Type: "String"
+    Default: "t2.micro"
+    AllowedValues:
+      - "t2.micro"
+      - "t2.small"
+      - "t2.medium"
+  EC2AvailabilityZone:
+    Description: "EC2 Instance AvailabilityZone"
+    Type: "String"
+  BaseStackName:
+    Description: "Base Stack Name"
+    Type: "String"
+  SharedStackName:
+    Description: "Shared Stack Name"
+    Type: "String"
+  DBInstanceSubnetExportName:
+    Description: "DB Instance Subnet Name"
+    Type: "String"
+  WordPressDBUser:
+    Description: "Wordpress DB User"
+    Type: "String"
+  WordPressDBPass:
+    Description: "Wordpress DB Pass"
+    Type: "String"
+    NoEcho: "True"
+  WordPressDBName:
+    Description: "Wordpress DB Name"
+    Type: "String"
+Resources:
+  DBInstance:
+    Type: "AWS::EC2::Instance"
+    Properties:
+      AvailabilityZone: !Ref EC2AvailabilityZone
+      InstanceType: !Ref EC2InstanceType
+      ImageId: !Ref ImageId
+      KeyName: !Ref KeyName
+      NetworkInterfaces:
+        - AssociatePublicIpAddress: "true"
+          DeviceIndex: "0"
+          SubnetId:
+            Fn::ImportValue: !Sub "${DBInstanceSubnetExportName}"
+          GroupSet:
+            - Fn::ImportValue: !Sub "${SharedStackName}-DBSecurityGroupID"
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash -xe
+
+          cat << EOF > /etc/yum.repos.d/docker.repo
+          [docker]
+          name=Docker repository
+          baseurl=http://yum.dockerproject.org/repo/main/centos/7/
+          enabled=1
+          gpgkey=http://yum.dockerproject.org/gpg
+          EOF
+
+          # Install Docker
+          yum install -y docker-engine
+
+          # Starting Docker Service
+          systemctl start docker
+          systemctl enable docker
+
+          # Start DB Container
+          docker run -d --name mysql -p 3306:3306 --restart always \
+          -e MYSQL_DATABASE=${WordPressDBName} \
+          -e MYSQL_USER=${WordPressDBUser} \
+          -e MYSQL_PASSWORD=${WordPressDBPass} \
+          -e MYSQL_RANDOM_ROOT_PASSWORD=yes \
+          mysql
+
+Outputs:
+  DBInstanceID:
+    Description: "ID of the DB Instance"
+    Value: !Ref DBInstance
+    Export:
+      Name: !Sub "${AWS::StackName}-InstanceID"
+  DBInstancePrivateIP:
+    Description: "PrivateIP of DB Instance"
+    Value: !GetAtt DBInstance.PrivateIp
+    Export:
+      Name: !Sub "${AWS::StackName}-PrivateIP"

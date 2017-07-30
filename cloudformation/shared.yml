@@ -1,0 +1,196 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "AWS CloudFormation Template for Tech Challenge: Shared Layer [Security Group, Subnets]"
+Parameters:
+  BaseStackName:
+    Description: "Name of the Base Stack"
+    Type: "String"
+Resources:
+  DBPrivSubnet1:
+    Type: "AWS::EC2::Subnet"
+    Properties:
+      AvailabilityZone: "ap-southeast-2a"
+      CidrBlock: "10.5.6.0/24"
+      VpcId:
+        Fn::ImportValue: !Sub "${BaseStackName}-VPCID"
+      Tags:
+        - Key: "Name"
+          Value: "DBPrivSubnet1"
+  DBPrivSubnet2:
+    Type: "AWS::EC2::Subnet"
+    Properties:
+      AvailabilityZone: "ap-southeast-2b"
+      CidrBlock: "10.5.7.0/24"
+      VpcId:
+        Fn::ImportValue: !Sub "${BaseStackName}-VPCID"
+      Tags:
+        - Key: "Name"
+          Value: "DBPrivSubnet2"
+  AppPrivSubnet1:
+    Type: "AWS::EC2::Subnet"
+    Properties:
+      AvailabilityZone: "ap-southeast-2a"
+      CidrBlock: "10.5.3.0/24"
+      VpcId:
+        Fn::ImportValue: !Sub "${BaseStackName}-VPCID"
+      Tags:
+        - Key: "Name"
+          Value: "AppPrivSubnet1"
+  AppPrivSubnet2:
+    Type: "AWS::EC2::Subnet"
+    Properties:
+      AvailabilityZone: "ap-southeast-2b"
+      CidrBlock: "10.5.4.0/24"
+      VpcId:
+        Fn::ImportValue: !Sub "${BaseStackName}-VPCID"
+      Tags:
+        - Key: "Name"
+          Value: "AppPrivSubnet2"
+  PubSubnet1:
+    Type: "AWS::EC2::Subnet"
+    Properties:
+      AvailabilityZone: "ap-southeast-2a"
+      CidrBlock: "10.5.0.0/24"
+      VpcId:
+        Fn::ImportValue: !Sub "${BaseStackName}-VPCID"
+      Tags:
+        - Key: "Name"
+          Value: "PubSubnet1"
+  PubSubnet2:
+    Type: "AWS::EC2::Subnet"
+    Properties:
+      AvailabilityZone: "ap-southeast-2b"
+      CidrBlock: "10.5.1.0/24"
+      VpcId:
+        Fn::ImportValue: !Sub "${BaseStackName}-VPCID"
+      Tags:
+        - Key: "Name"
+          Value: "PubSubnet2"
+  PublicRouteTable:
+    Type: "AWS::EC2::RouteTable"
+    Properties:
+      VpcId:
+        Fn::ImportValue: !Sub "${BaseStackName}-VPCID"
+  PublicRoute:
+    Type: "AWS::EC2::Route"
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: "0.0.0.0/0"
+      GatewayId:
+        Fn::ImportValue: !Sub "${BaseStackName}-InetGwID"
+  AppPrivSubnet1RouteTableAssociation:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties:
+      SubnetId: !Ref AppPrivSubnet1
+      RouteTableId: !Ref PublicRouteTable
+  AppPrivSubnet2RouteTableAssociation:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties:
+      SubnetId: !Ref AppPrivSubnet2
+      RouteTableId: !Ref PublicRouteTable
+  DBPrivSubnet1RouteTableAssociation:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties:
+      SubnetId: !Ref DBPrivSubnet1
+      RouteTableId: !Ref PublicRouteTable
+  DBPrivSubnet2RouteTableAssociation:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties:
+      SubnetId: !Ref DBPrivSubnet2
+      RouteTableId: !Ref PublicRouteTable
+  PubSubnet1RouteTableAssociation:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties:
+      SubnetId: !Ref PubSubnet1
+      RouteTableId: !Ref PublicRouteTable
+  PubSubnet2RouteTableAssociation:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties:
+      SubnetId: !Ref PubSubnet2
+      RouteTableId: !Ref PublicRouteTable
+  AppSecurityGroup:
+    Type: "AWS::EC2::SecurityGroup"
+    Properties:
+      GroupDescription: "Allow HTTP and SSH Traffic"
+      VpcId:
+        Fn::ImportValue: !Sub "${BaseStackName}-VPCID"
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          SourceSecurityGroupId: !Ref ELBSecurityGroup
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+  DBSecurityGroup:
+    Type: "AWS::EC2::SecurityGroup"
+    Properties:
+      GroupDescription: "Allow DB and SSH Traffic"
+      VpcId:
+        Fn::ImportValue: !Sub "${BaseStackName}-VPCID"
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 3306
+          ToPort: 3306
+          SourceSecurityGroupId: !Ref AppSecurityGroup
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+  ELBSecurityGroup:
+    Type: "AWS::EC2::SecurityGroup"
+    Properties:
+      GroupDescription: "Allow HTTP Traffic"
+      VpcId:
+        Fn::ImportValue: !Sub "${BaseStackName}-VPCID"
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+Outputs:
+  DBPrivSubnet1Id:
+    Description: "The ID of DB Private Subnet 1"
+    Value: !Ref DBPrivSubnet1
+    Export:
+      Name: !Sub "${AWS::StackName}-DBPrivSubnet1ID"
+  DBPrivSubnet2Id:
+    Description: "The ID of DB Private Subnet 2"
+    Value: !Ref DBPrivSubnet2
+    Export:
+      Name: !Sub "${AWS::StackName}-DBPrivSubnet2ID"
+  AppPrivSubnet1Id:
+    Description: "The ID of App Private Subnet 1"
+    Value: !Ref AppPrivSubnet1
+    Export:
+      Name: !Sub "${AWS::StackName}-AppPrivSubnet1ID"
+  AppPrivSubnet2Id:
+    Description: "The ID of App Private Subnet 2"
+    Value: !Ref AppPrivSubnet2
+    Export:
+      Name: !Sub "${AWS::StackName}-AppPrivSubnet2ID"
+  PubSubnet1Id:
+    Description: "The ID of Public Subnet 1"
+    Value: !Ref PubSubnet1
+    Export:
+      Name: !Sub "${AWS::StackName}-PubSubnet1ID"
+  PubSubnet2Id:
+    Description: "The ID of Public Subnet 2"
+    Value: !Ref PubSubnet2
+    Export:
+      Name: !Sub "${AWS::StackName}-PubSubnet2ID"
+  AppSecurityGroupId:
+    Description: "The ID of App Security Group"
+    Value: !Ref AppSecurityGroup
+    Export:
+      Name: !Sub "${AWS::StackName}-AppSecurityGroupID"
+  DBSecurityGroupId:
+    Description: "The ID of DB Security Group"
+    Value: !Ref DBSecurityGroup
+    Export:
+      Name: !Sub "${AWS::StackName}-DBSecurityGroupID"
+  ELBSecurityGroupId:
+    Description: "The ID of ELB Security Group"
+    Value: !Ref ELBSecurityGroup
+    Export:
+      Name: !Sub "${AWS::StackName}-ELBSecurityGroupID"

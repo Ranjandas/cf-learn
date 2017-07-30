@@ -1,0 +1,90 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Cloudformation Template for Creating App Instances"
+Parameters:
+  ImageId:
+    Description: "ID of the Image to use for this instance"
+    Type: "String"
+    Default: "ami-10918173"
+  KeyName:
+    Description: "Name of an existing EC2 KeyPair"
+    Type: "AWS::EC2::KeyPair::KeyName"
+    Default: "tech-challenge"
+  EC2InstanceType:
+    Description: "EC2 Instance Type"
+    Type: "String"
+    Default: "t2.micro"
+    AllowedValues:
+      - "t2.micro"
+      - "t2.small"
+      - "t2.medium"
+  EC2AvailabilityZone:
+    Description: "EC2 Instance AvailabilityZone"
+    Type: "String"
+  BaseStackName:
+    Description: "Base Stack Name"
+    Type: "String"
+  SharedStackName:
+    Description: "Shared Stack Name"
+    Type: "String"
+  AppInstanceSubnetExportName:
+    Description: "App Instance Subnet Name"
+    Type: "String"
+  WordPressDBUser:
+    Description: "Wordpress DB User"
+    Type: "String"
+  WordPressDBPass:
+    Description: "Wordpress DB Pass"
+    Type: "String"
+    NoEcho: "True"
+  WordPressDBName:
+    Description: "Wordpress DB Name"
+    Type: "String"
+  WordPressDBHost:
+    Description: "Wordpress DB Host"
+    Type: "String"
+Resources:
+  AppInstance:
+    Type: "AWS::EC2::Instance"
+    Properties:
+      AvailabilityZone: !Ref EC2AvailabilityZone
+      InstanceType: !Ref EC2InstanceType
+      ImageId: !Ref ImageId
+      KeyName: !Ref KeyName
+      NetworkInterfaces:
+        - AssociatePublicIpAddress: "true"
+          DeviceIndex: "0"
+          SubnetId:
+            Fn::ImportValue: !Sub "${AppInstanceSubnetExportName}"
+          GroupSet:
+            - Fn::ImportValue: !Sub "${SharedStackName}-AppSecurityGroupID"
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash -xe
+
+          cat << EOF > /etc/yum.repos.d/docker.repo
+          [docker]
+          name=Docker repository
+          baseurl=http://yum.dockerproject.org/repo/main/centos/7/
+          enabled=1
+          gpgkey=http://yum.dockerproject.org/gpg
+          EOF
+          # Install Docker
+          yum install -y docker-engine
+
+          # Starting Docker Service
+          systemctl start docker
+          systemctl enable docker
+
+          docker run -d --name wordpress --restart always \
+          -p 80:80 \
+          -e WORDPRESS_DB_HOST=${WordPressDBHost} \
+          -e WORDPRESS_DB_USER=${WordPressDBUser} \
+          -e WORDPRESS_DB_PASSWORD=${WordPressDBPass} \
+          -e WORDPRESS_DB_NAME=${WordPressDBName} \
+          wordpress
+Outputs:
+  AppInstanceID:
+    Description: "ID of the App Instance"
+    Value: !Ref AppInstance
+    Export:
+      Name: !Sub "${AWS::StackName}-InstanceID"

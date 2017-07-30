@@ -1,0 +1,36 @@
+---
+
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "AWS CloudFormation Template for Tech Challenge: Base Layer [VPC,Gateways,NATS]"
+Resources:
+  TechChallengeVPC:
+    Type: "AWS::EC2::VPC"
+    Properties:
+      CidrBlock: "10.5.0.0/16"
+      EnableDnsSupport: "true"
+      EnableDnsHostnames: "true"
+      Tags:
+        - Key: "Name"
+          Value: "TechChallengeVPC"
+  InetGw:
+    Type: "AWS::EC2::InternetGateway"
+    Properties:
+      Tags:
+        - Key: "Name"
+          Value: "TCInetGW"
+  VpcGwAttachement:
+    Type: "AWS::EC2::VPCGatewayAttachment"
+    Properties:
+      InternetGatewayId: !Ref InetGw
+      VpcId: !Ref TechChallengeVPC
+Outputs:
+  TechChallengeVPCId:
+    Description: "The ID of TechChallenge VPC"
+    Value: !Ref TechChallengeVPC
+    Export:
+      Name: !Sub "${AWS::StackName}-VPCID"
+  InetGwId:
+    Description: "The ID of Ineternet Gateway"
+    Value: !Ref InetGw
+    Export:
+      Name: !Sub "${AWS::StackName}-InetGwID"
